@@ -1,0 +1,9 @@
+inference-sdk
+streamlit
+opencv-python
+cvlib
+numpy
+matplotlib
+requests
+pillow
+urllib3
