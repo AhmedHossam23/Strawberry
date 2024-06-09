@@ -20,11 +20,22 @@ def load_image_from_url(url):
     response = requests.get(url)
     return Image.open(BytesIO(response.content))
 
-# Function to load images from URL
+# # Function to load images from URL
+# def load_image_from_url_2(url):
+#     response = urllib.request.urlopen(url)
+#     imgnp = np.array(bytearray(response.read()), dtype=np.uint8)
+#     return cv2.imdecode(imgnp, -1)
+
 def load_image_from_url_2(url):
-    response = urllib.request.urlopen(url)
-    imgnp = np.array(bytearray(response.read()), dtype=np.uint8)
-    return cv2.imdecode(imgnp, -1)
+    try:
+        response = requests.get(url, stream=True, timeout=5)
+        response.raise_for_status()
+        imgnp = np.array(bytearray(response.raw.read()), dtype=np.uint8)
+        return cv2.imdecode(imgnp, -1)
+    except requests.RequestException as e:
+        st.error(f"Failed to load image from URL: {e}")
+        return None
+
 
 # Initialize Streamlit
 st.title("Real-Time Object Detection")
@@ -125,10 +136,10 @@ cam_url = st.text_input("Enter the Camera URL", "")
 if st.button("Start Object Detection", key="start_button"):
     while stop_trigger != "0":
 
-        cap = cv2.VideoCapture(cam_url)
+        # cap = cv2.VideoCapture(cam_url)
         stframe = st.empty()
 
-        while cap.isOpened():
+        while True:
             
     
             frame = load_image_from_url_2(cam_url)
