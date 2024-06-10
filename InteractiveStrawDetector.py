@@ -14,29 +14,39 @@ import urllib.request
 import time
 from PIL import Image
 from io import BytesIO
+import aiohttp
+import asyncio
 
 # Function to load images from URL
 def load_image_from_url(url):
     response = requests.get(url)
     return Image.open(BytesIO(response.content))
 
-# # Function to load images from URL
+# Function to load images from URL
+# performanc optimization 
+
+# Asynchronous function to load images from URL
+async def load_image_from_url_2(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.read()
+                imgnp = np.array(bytearray(data), dtype=np.uint8)
+                return cv2.imdecode(imgnp, -1)
+            else:
+                st.error(f"Failed to load image from URL: {response.status}")
+                return None
+
+
 # def load_image_from_url_2(url):
-#     response = urllib.request.urlopen(url)
-#     imgnp = np.array(bytearray(response.read()), dtype=np.uint8)
-#     return cv2.imdecode(imgnp, -1)
-
-def load_image_from_url_2(url):
-    try:
-        response = requests.get(url, stream=True, timeout=5)
-        response.raise_for_status()
-        imgnp = np.array(bytearray(response.raw.read()), dtype=np.uint8)
-        return cv2.imdecode(imgnp, -1)
-    except requests.RequestException as e:
-        st.error(f"Failed to load image from URL: {e}")
-        return None
-
-
+#     try:
+#         response = requests.get(url, stream=True, timeout=5)
+#         response.raise_for_status()
+#         imgnp = np.array(bytearray(response.raw.read()), dtype=np.uint8)
+#         return cv2.imdecode(imgnp, -1)
+#     except requests.RequestException as e:
+#         st.error(f"Failed to load image from URL: {e}")
+#         return None
 # Initialize Streamlit
 st.title("Real-Time Object Detection")
 
@@ -73,7 +83,7 @@ for url in example_image_urls:
 # Initialize the inference client
 CLIENT = InferenceHTTPClient(
     api_url="https://detect.roboflow.com",
-    api_key="GmRcGwYcYUQfjQ331pz6"
+    api_key="0RomofAgLdzPXK31LjzR"
 )
 
 # Webcam capture initialization
@@ -126,30 +136,56 @@ def infer_and_draw(frame):
 
 
 
-stop_trigger = st.text_input("whenever you want to stop enter 0", "")
-
 # URL Input for Image
-cam_url = st.text_input("Enter the Camera URL", "")
+cam_url = st.text_input("Enter the Camera URL", key="cam_url")
 
+# Input to stop the detection loop
+stop_input = st.text_input("Stop the detection (enter 0)", key="stop_input")
 
 # Fetch and Process Image Button
 if st.button("Start Object Detection", key="start_button"):
-    while stop_trigger != "0":
-
-        # cap = cv2.VideoCapture(cam_url)
+    if not cam_url:
+        st.error("Please enter a valid camera URL.")
+    else:
         stframe = st.empty()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        async def process_frames():
+            while True:
+                frame = await load_image_from_url_2(cam_url)
+                if frame is not None:
+                    frame = infer_and_draw(frame)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    stframe.image(frame, channels="RGB")
+                else:
+                    st.error("Failed to load image from URL")
+                    break
+                if stop_input == "0":
+                    break
+        
+        loop.run_until_complete(process_frames())
 
-        while True:
+
+
+# Fetch and Process Image Button
+# if st.button("Start Object Detection", key="start_button"):
+#     while stop_trigger != "0":
+
+#         cap = cv2.VideoCapture(cam_url)
+#         stframe = st.empty()
+
+#         while cap.isOpened():
             
     
-            frame = load_image_from_url_2(cam_url)
-            # ret, frame = cap.read()
-            if frame is not None:
-                frame = infer_and_draw(frame)
-                # Convert frame to RGB for Streamlit
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) 
-                stframe.image(frame, channels="RGB")
+#             frame = load_image_from_url_2(cam_url)
+#             # ret, frame = cap.read()
+#             if frame is not None:
+#                 frame = infer_and_draw(frame)
+#                 # Convert frame to RGB for Streamlit
+#                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) 
+#                 stframe.image(frame, channels="RGB")
                     
-            else:
-                st.error("Failed to load image from URL")
-                break
+#             else:
+#                 st.error("Failed to load image from URL")
+#                 break
